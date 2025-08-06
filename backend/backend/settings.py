@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'api',  # Your API application
 ]
 
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # CORS middleware must be placed at the top
     'django.middleware.security.SecurityMiddleware',
@@ -128,3 +129,9 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,                  # 20 movies per page
+}
+
