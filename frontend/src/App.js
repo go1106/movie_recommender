@@ -1,5 +1,6 @@
 import React from 'react';
 import MovieList from './components/MovieList';
+//import RatingList from './components/RatingList';
 //import { BrowserRouter as Router, Routes,Route } from 'react-router-dom';
 
 
