@@ -12,6 +12,14 @@ export default function MovieList() {
   const [nextUrl, setNextUrl] = useState(null);
   const [prevUrl, setPrevUrl] = useState(null);
 
+  //sort and filter states
+  const [sortBy, setSortBy] = useState('title'); // Default sort
+  const [sortOrder, setSortOrder] = useState('asc'); // Default order       
+  const [filterBy, setFilterBy] = useState('ALL'); // Default filter  
+    //const [filterValue, setFilterValue] = useState(''); // Default filter value 
+  const [minRating, setMinRating] = useState(0); // Default filter value
+    // Debounced fetch function
+
   const debouncedFetch = useMemo(
     () =>
       debounce((fetchUrl) => {
@@ -36,6 +44,41 @@ export default function MovieList() {
     return () => debouncedFetch.cancel();
   }, [searchTerm, debouncedFetch]);
 
+  //extract all genres from movies 
+    const allGenres = useMemo(() => {
+        const genresSet = new Set();
+        movies.forEach(movie => {
+        if (movie.genres) {
+            movie.genres.split('|').forEach(genre => genresSet.add(genre.trim()));
+        }
+        });
+        return Array.from(genresSet);
+    }, [movies]);
+
+    // Filter movies based on search term, sort, and filter criteria
+
+    const filteredMovies = useMemo(() => {  
+        return movies
+        .filter(movie => {
+            const matchesSearch = movie.title.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesGenre = filterBy === 'ALL' || (movie.genres && movie.genres.includes(filterBy));
+            const matchesRating = movie.average_rating >= minRating;
+            return matchesSearch && matchesGenre && matchesRating;
+        })
+        .sort((a, b) => {
+            const aValue = sortBy === 'title' ? a.title.toLowerCase() :
+                          sortBy === 'rating' ? a.average_rating || 0 :
+                          a.year || 0;
+            const bValue = sortBy === 'title' ? b.title.toLowerCase() :
+                          sortBy === 'rating' ? b.average_rating || 0 :
+                          b.year || 0;
+            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [movies, searchTerm, sortBy, sortOrder, filterBy, minRating]);
+
+
 
   // Handlers that reference the stateful nextUrl/prevUrl
   const handleNext = () => {
@@ -58,6 +101,7 @@ export default function MovieList() {
   return (
     <section style={styles.container}>
       <h2>Movie List</h2>
+      {/*search*/}
       <input
         type="text"
         aria-label="Search movies"
@@ -66,16 +110,56 @@ export default function MovieList() {
         onChange={e => setSearchTerm(e.target.value)}
         style={styles.input}
       />
+        {/*sort and filter*/}
+        <div>
+        <label> Sort by: </label>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
+          <option value="title">Title</option>
+          <option value="rating">Rating</option>
+          <option value="year">Year</option>
+        </select>
+        <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
+        </select>
+        </div>
+        {/*genre buttons*/}
+        <div>   
+        <label>Filter by Genre: </label>
+        <select value={filterBy} onChange={e => setFilterBy(e.target.value)}>
+          <option value="ALL">All</option>
+          {allGenres.map(genre => (
+            <option key={genre} value={genre}>
+              {genre}
+            </option>
+          ))}
+        </select>
+        </div>
+
+        {/*rating filter*/}
+        <div>
+        <label>Minimum Rating: </label>
+        <input
+          type="number"
+          value={minRating}
+          onChange={e => setMinRating(Number(e.target.value))}
+          min="0"
+          max="10"
+          step="0.1"
+          style={{ width: '100px', marginLeft: '10px' }}
+        />
+        </div>  
 
       {loading && <p>Loading…</p>}
       {error   && <p style={{ color: 'red' }}>Error: {error.message}</p>}
       {!loading && !movies.length && <p>No movies found.</p>}
 
       <ul style={styles.list}>
-        {movies.map(movie => (
+        {filteredMovies.map(movie => (
           <li key={movie.movieId} style={{marginBottom: '10px', border: '1px solid #ccc', padding: '10px'}}>
             <strong>{movie.title}</strong> <br />
-            <span>{movie.genres}</span> <br />  
+            <span>{movie.genres}</span> <br />
+            <span>Year: {movie.year || 'N/A'}</span> <br />  
             <span>Rating: {movie.average_rating||'N/A'}</span> <br />   
           </li>
         ))}
