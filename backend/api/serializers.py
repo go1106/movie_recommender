@@ -11,6 +11,8 @@ class MovieSerializer(serializers.ModelSerializer):
 
         if ratings.exists():
             return round(sum(rating.rating for rating in ratings) / len(ratings),2)
+        
+       
         return None
 
 class RatingSerializer(serializers.ModelSerializer):

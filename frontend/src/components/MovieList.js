@@ -20,11 +20,7 @@ export default function MovieList() {
     
 
 
-    //const dirPrefix =sortOrder === 'asc' ? '' : '-';
-    //const ordering = `${dirPrefix}${sortBy}`; // Prefix for descending order
-
-    //const fetchUrl = `http://localhost:8000/api/movies/` + `?search=${encodeURIComponent(searchTerm)}`+`&ordering=${encodeURIComponent(ordering)}`; // Construct URL with search and ordering    
-
+    
     // Debounced fetch function to avoid excessive API calls
   const debouncedFetch = useMemo(
     () =>
@@ -37,6 +33,7 @@ export default function MovieList() {
             setMovies(res.data.results || []); // Handle paginated results
             setNextUrl(res.data.next);
             setPrevUrl(res.data.previous);
+            //setMovies(res.data);
         })
           .catch(err => setError(err))
           .finally(() => setLoading(false));
@@ -50,9 +47,13 @@ export default function MovieList() {
     const params = new URLSearchParams({
       search: searchTerm,
       ordering: dir + sortBy, // Use the dir prefix for sorting
-      //filter: filterBy, // Add filter if needed
-      min_rating: minRating,
+      average_rating: minRating,
     });
+    
+    if(filterBy !== 'ALL') {
+      params.append('genres', filterBy); // Add genre filter if not 'ALL'
+      setCurrentPage(1); // Reset to first page when filter changes
+    }
     const fetchUrl = `http://localhost:8000/api/movies/?${params.toString()}`; // Construct URL with search and ordering
     //const fetchUrl = `http://localhost:8000/api/movies/?search=${encodeURIComponent(searchTerm)}`;
     //console.log('Fetching URL:', fetchUrl);
@@ -71,30 +72,23 @@ export default function MovieList() {
         return Array.from(genresSet);
     }, [movies]);
 
-    // Filter movies based on search term, sort, and filter criteria
 
-    const filteredMovies = useMemo(() => {  
-        return movies
-        .filter(movie => {
-            const matchesSearch = movie.title.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesGenre = filterBy === 'ALL' || (movie.genres && movie.genres.includes(filterBy));
-            const matchesRating = movie.average_rating >= minRating;
-            return matchesSearch && matchesGenre && matchesRating;
-        }
-        )
-        
-}, [movies,filterBy, minRating]);
+
+
+
+
+
 
   const [currentPage, setCurrentPage] = useState(1);
   //const [genreFilter, setGenreFilter]   = useState('All');
-  const moviesPerPage = 20;
+  //const moviesPerPage = 20;
 
-  const pageCount = Math.ceil(filteredMovies.length / moviesPerPage);
-  const startIdx  = (currentPage - 1) * moviesPerPage;
+  //const pageCount = Math.ceil(filteredMovies.length / moviesPerPage);
+  //const startIdx  = (currentPage - 1) * moviesPerPage;
   //const endIdx    = startIdx + moviesPerPage;
 
   // 3) Then, slice out only the current page’s items
-  const paginated =filteredMovies.slice(startIdx, startIdx + moviesPerPage);
+  //const paginated =filteredMovies.slice(startIdx, startIdx + pageCount);
         
    
 
@@ -174,7 +168,7 @@ export default function MovieList() {
       {!loading && !movies.length && <p>No movies found.</p>}
 
       <ul style={styles.list}>
-        {filteredMovies.map(movie => (
+        {movies.map(movie => (
           <li key={movie.movieId} style={{marginBottom: '10px', border: '1px solid #ccc', padding: '10px'}}>
             <strong>{movie.title}</strong> <br />
             <span>{movie.genres}</span> <br />
