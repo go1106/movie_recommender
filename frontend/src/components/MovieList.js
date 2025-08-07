@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import debounce from 'lodash/debounce';
 import axios from 'axios';
 
@@ -16,10 +16,16 @@ export default function MovieList() {
   const [sortBy, setSortBy] = useState('title'); // Default sort
   const [sortOrder, setSortOrder] = useState('asc'); // Default order       
   const [filterBy, setFilterBy] = useState('ALL'); // Default filter  
-    //const [filterValue, setFilterValue] = useState(''); // Default filter value 
   const [minRating, setMinRating] = useState(0); // Default filter value
-    // Debounced fetch function
+    
 
+
+    //const dirPrefix =sortOrder === 'asc' ? '' : '-';
+    //const ordering = `${dirPrefix}${sortBy}`; // Prefix for descending order
+
+    //const fetchUrl = `http://localhost:8000/api/movies/` + `?search=${encodeURIComponent(searchTerm)}`+`&ordering=${encodeURIComponent(ordering)}`; // Construct URL with search and ordering    
+
+    // Debounced fetch function to avoid excessive API calls
   const debouncedFetch = useMemo(
     () =>
       debounce((fetchUrl) => {
@@ -39,10 +45,20 @@ export default function MovieList() {
   );
 
   useEffect(() => {
-    const fetchUrl = `http://localhost:8000/api/movies/?search=${encodeURIComponent(searchTerm)}`;
+    const dir   = sortOrder === 'asc' ? '' : '-';
+    //const ordering = `${dir}${sortBy}`; // Prefix for descending order
+    const params = new URLSearchParams({
+      search: searchTerm,
+      ordering: dir + sortBy, // Use the dir prefix for sorting
+      //filter: filterBy, // Add filter if needed
+      min_rating: minRating,
+    });
+    const fetchUrl = `http://localhost:8000/api/movies/?${params.toString()}`; // Construct URL with search and ordering
+    //const fetchUrl = `http://localhost:8000/api/movies/?search=${encodeURIComponent(searchTerm)}`;
+    //console.log('Fetching URL:', fetchUrl);
     debouncedFetch(fetchUrl);
     return () => debouncedFetch.cancel();
-  }, [searchTerm, debouncedFetch]);
+  }, [searchTerm, sortBy, sortOrder, filterBy, minRating,debouncedFetch]);
 
   //extract all genres from movies 
     const allGenres = useMemo(() => {
@@ -64,20 +80,23 @@ export default function MovieList() {
             const matchesGenre = filterBy === 'ALL' || (movie.genres && movie.genres.includes(filterBy));
             const matchesRating = movie.average_rating >= minRating;
             return matchesSearch && matchesGenre && matchesRating;
-        })
-        .sort((a, b) => {
-            const aValue = sortBy === 'title' ? a.title.toLowerCase() :
-                          sortBy === 'rating' ? a.average_rating || 0 :
-                          a.year || 0;
-            const bValue = sortBy === 'title' ? b.title.toLowerCase() :
-                          sortBy === 'rating' ? b.average_rating || 0 :
-                          b.year || 0;
-            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [movies, searchTerm, sortBy, sortOrder, filterBy, minRating]);
+        }
+        )
+        
+}, [movies,filterBy, minRating]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  //const [genreFilter, setGenreFilter]   = useState('All');
+  const moviesPerPage = 20;
+
+  const pageCount = Math.ceil(filteredMovies.length / moviesPerPage);
+  const startIdx  = (currentPage - 1) * moviesPerPage;
+  //const endIdx    = startIdx + moviesPerPage;
+
+  // 3) Then, slice out only the current page’s items
+  const paginated =filteredMovies.slice(startIdx, startIdx + moviesPerPage);
+        
+   
 
 
   // Handlers that reference the stateful nextUrl/prevUrl
@@ -115,7 +134,7 @@ export default function MovieList() {
         <label> Sort by: </label>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
           <option value="title">Title</option>
-          <option value="rating">Rating</option>
+          <option value="average_rating">Rating</option>
           <option value="year">Year</option>
         </select>
         <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
