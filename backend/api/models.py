@@ -151,3 +151,64 @@ class ListItem(models.Model):
     class Meta:
         unique_together = (('list','movie'),)
         ordering = ['position','-created_at']
+
+
+
+# --- Analytics & Recommender ---
+
+class Event(models.Model):
+    """
+    Lightweight event log for feed/recs UX:
+    - impression: item shown
+    - click: item opened
+    - like/dismiss/rate: feedback actions
+    """
+    ACTIONS = (
+        ('impression','impression'),
+        ('click','click'),
+        ('like','like'),
+        ('dismiss','dismiss'),
+        ('rate','rate'),
+    )
+    userId = models.IntegerField(null=True, blank=True, db_index=True)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, null=True, blank=True, related_name='events')
+    action = models.CharField(max_length=12, choices=ACTIONS)
+    context = models.JSONField(default=dict, blank=True)  # e.g. {"algo":"hybrid","slot":3}
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['userId','action','created_at']),
+            models.Index(fields=['action','created_at']),
+        ]
+
+class RecommendationCache(models.Model):
+    """
+    Snapshot of top-K for a user (store movieId ints).
+    Keep TTL app-side or refresh on demand.
+    """
+    userId = models.IntegerField(unique=True, db_index=True)
+    items = models.JSONField(default=list, blank=True)   # e.g., [123, 456, 789]
+    model_version = models.CharField(max_length=32, default='v1')
+    updated_at = models.DateTimeField(auto_now=True)
+
+class Embedding(models.Model):
+    """
+    Generic vector store. Start with BinaryField (packed float32).
+    Later you can migrate to pgvector.
+    """
+    OBJECT_TYPES = (('movie','movie'), ('user','user'), ('tag','tag'))
+    object_type = models.CharField(max_length=8, choices=OBJECT_TYPES)
+    object_id = models.IntegerField(db_index=True)  # movieId, userId, or Tag.pk
+    dim = models.IntegerField()
+    vector = models.BinaryField()                   # pack with numpy.tobytes()
+    model_version = models.CharField(max_length=32, default='v1')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('object_type','object_id','model_version'),)
+        indexes = [
+            models.Index(fields=['object_type','model_version']),
+            models.Index(fields=['object_id']),
+        ]
+
