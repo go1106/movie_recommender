@@ -1,5 +1,17 @@
 from rest_framework import serializers
-from .models import Movie, Rating   
+from .models import Movie, Rating, MovieTag, Tag, Person, MovieCast
+
+class PersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = ['id', 'name', 'tmdb_id', 'imdb_id', 'profile_url']
+
+class MovieCastSerializer(serializers.ModelSerializer):
+    person = PersonSerializer(read_only=True)
+
+    class Meta:
+        model = MovieCast
+        fields = ['movie', 'person','character']
 
 class MovieSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
