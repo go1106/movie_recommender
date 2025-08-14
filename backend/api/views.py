@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from django.db.models import Avg, Value
+from django.db.models import Avg, Value, F
+from django.db.models import Prefetch
 
 from rest_framework import viewsets, filters
 from .models import Movie, Rating
@@ -18,8 +19,7 @@ class MoviFilter(djfilters.FilterSet):
         fields = ['genres', 'average_rating']   
 
 class MovieViewSet(viewsets.ModelViewSet):
-    queryset = Movie.objects.annotate(
-        average_rating=Coalesce(Avg('rating__rating'),Value(0.0)))
+
     serializer_class = MovieSerializer
 
     # Enable filtering, searching, and ordering
@@ -33,6 +33,25 @@ class MovieViewSet(viewsets.ModelViewSet):
     ordering_fields = ['title', 'average_rating', 'year']  # Allow ordering by these fields
     ordering = ['-average_rating']  # Default ordering by title   
     #pagination_class = None  # Disable pagination for simplicity, can be customized as needed
+
+    def get_queryset(self):
+        return(
+            Movie.objects
+                .annotate(average_rating=Coalesce(Avg('rating__rating'), Value(0.0)))
+                .prefetch_related(
+                    Prefetch(
+                        'castings', 
+                        queryset=MovieCast.objects
+                            .select_related('person')
+                            .order_by("order", 'id')
+                    )
+                )
+        )
+
+  
+       
+
+
 
 
 class RatingViewSet(viewsets.ModelViewSet):
