@@ -31,7 +31,7 @@ class Movie(models.Model):
     overview = models.TextField(blank=True)  # Optional field for movie overview
     poster_url = models.URLField( null=True, blank=True) 
     imdb_id = models.CharField(max_length=20, null=True, blank=True)  # Optional field for IMDb ID
-    tmdb_id = models.CharField(max_length=20, null=True, blank=True)  # Optional field for TMDb ID
+    tmdb_id = models.CharField(max_length=20, null=True, blank=True, db_index=True)  # Optional field for TMDb ID
     #new denormalized fields
     slug = models.SlugField(max_length=255, unique=True, blank=True)  # Slug field for URL-friendly names
     rating_count = models.IntegerField(default=0)  # Count of ratings received
@@ -211,4 +211,5 @@ class Embedding(models.Model):
             models.Index(fields=['object_type','model_version']),
             models.Index(fields=['object_id']),
         ]
+
 

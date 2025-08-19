@@ -1,6 +1,7 @@
 from .models import Event
+from typing import Optional, Dict, Any
 
-def log_event(user_id: int | None, action: str, movie_id: int | None, **ctx):
+def log_event(user_id: Optional[int], action: str, movie_id: Optional[int], **ctx):
     Event.objects.create(userId=user_id, action=action, movie_id=movie_id, context=ctx)
 
 

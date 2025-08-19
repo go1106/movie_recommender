@@ -4,7 +4,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.text import slugify
-from app.models import Movie  # adjust import
+from api.models import Movie  # adjust import
 import requests
 
 TMDB_KEY = "feda2c7c12b2a9fbbea6a861c1367e30"

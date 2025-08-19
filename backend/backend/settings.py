@@ -141,3 +141,8 @@ REST_FRAMEWORK = {
     ],
 }
 
+
+# settings.py
+import os
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "feda2c7c12b2a9fbbea6a861c1367e30")
+
