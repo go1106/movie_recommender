@@ -1,22 +1,66 @@
 from django.shortcuts import render
-from django.db.models import Avg, Value, F
+from django.db.models import Avg, Value, F, Q
 from django.db.models import Prefetch
 
 from rest_framework import viewsets, filters
-from .models import Movie, Rating
+from .models import Movie, Rating, MovieCast, Person, Genre
 from .serializers import MovieSerializer, RatingSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 
 from django_filters import rest_framework as djfilters
 from django.db.models.functions import Coalesce
 
-from .models import MovieCast
-from .models import Person
-from .serializers import PersonSerializer, MovieCastSerializer
+from .serializers import PersonSerializer, MovieCastSerializer, MovieSerializer, GenreSerializer,MovieListSerializer
 from .utils import more_like_this, log_event
 from .models import RecommendationCache 
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet
+
+
+class MovieFilter(filters.FilterSet):
+    q = filters.CharFilter(method="search")
+    min_rating = filters.NumberFilter(method="filter_min_rating")
+    max_rating = filters.NumberFilter(method="filter_max_rating")
+    genre = filters.CharFilter(field_name="genres__name", lookup_expr="iexact")  # if you have a Genre model
+    year = filters.NumberFilter(field_name="year")
+    year_gte = filters.NumberFilter(field_name="year", lookup_expr="gte")
+    year_lte = filters.NumberFilter(field_name="year", lookup_expr="lte")
+
+    class Meta:
+        model = Movie
+        fields = ["genre", "year"]
+
+    def search(self, qs, name, value):
+        return qs.filter(
+            Q(title__icontains=value) |
+            Q(overview__icontains=value) |
+            Q(cast__name__icontains=value)  # adjust to your relations
+        ).distinct()
+
+    def _with_avg(self, qs):
+        return qs.annotate(avg_rating=Avg("ratings__rating"))
+
+    def filter_min_rating(self, qs, name, value):
+        return self._with_avg(qs).filter(avg_rating__gte=value)
+
+    def filter_max_rating(self, qs, name, value):
+        return self._with_avg(qs).filter(avg_rating__lte=value)
+
+class MovieViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Movie.objects.all().prefetch_related("ratings")
+    serializer_class = MovieSerializer
+    filter_backends = [filters.DjangoFilterBackend]
+    filterset_class = MovieFilter
+    ordering_fields = ["title", "year", "avg_rating"]
+    ordering = ["-id"]  # default
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # enable ordering by avg_rating safely
+        if self.request.query_params.get("ordering") in ("avg_rating", "-avg_rating"):
+            qs = qs.annotate(avg_rating=Avg("ratings__rating"))
+        return qs
 
 class MoviFilter(djfilters.FilterSet):
     genres = djfilters.CharFilter(field_name='genres', lookup_expr='icontains')
@@ -25,7 +69,7 @@ class MoviFilter(djfilters.FilterSet):
     class Meta:
         model = Movie
         fields = ['genres', 'average_rating']   
-
+"""
 class MovieViewSet(viewsets.ModelViewSet):
 
     serializer_class = MovieSerializer
@@ -58,7 +102,19 @@ class MovieViewSet(viewsets.ModelViewSet):
 
   
        
+"""
+class MovieViewSet(ReadOnlyModelViewSet):
+    serializer_class = MovieListSerializer
+    filterset_fields = ["average_rating", "year", "genres__name"]
+    search_fields = ["title", "overview"]
+    ordering_fields = ["title", "year", "average_rating", "rating_count"]
+    ordering = ["-average_rating", "-rating_count"]
 
+    def get_queryset(self):
+        return (
+            Movie.objects.all()
+            .prefetch_related("genres", Prefetch("castings", queryset=MovieCast.objects.select_related("person")))
+        )
 
 
 

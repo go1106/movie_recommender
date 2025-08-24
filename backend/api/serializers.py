@@ -55,3 +55,17 @@ class RatingSerializer(serializers.ModelSerializer):
         model = Rating
         fields = ['userId', 'movie', 'rating']
         read_only_fields = ['movie']  # Make movie read-only to prevent direct assignment
+from rest_framework import serializers
+from .models import Movie
+
+class MovieListSerializer(serializers.ModelSerializer):
+    avg_rating_calc = serializers.FloatField(read_only=True)
+    rating_count_calc = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Movie
+        fields = (
+            "movieId", "slug", "title", "year", "poster_url", "overview",
+            "average_rating", "rating_count",      # stored fields, still available
+            "avg_rating_calc", "rating_count_calc" # computed fields
+        )
