@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Django REST Framework
+    'django_filters',
     'corsheaders',  # CORS headers for API
     'backend',  # Your main application
     'api',  # Your API application

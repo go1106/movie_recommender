@@ -1,71 +1,48 @@
 from rest_framework import serializers
-from .models import Movie, Rating, MovieTag, Tag, Person, MovieCast, Genre
-
-class PersonSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Person
-        fields = ['id', 'name','profile_url']
-
-class MovieCastSerializer(serializers.ModelSerializer):
-    person = PersonSerializer(read_only=True)
-
-    class Meta:
-        model = MovieCast
-        fields = ['movie', 'person','character']
-
-#class MovieSerializer(serializers.ModelSerializer):
-    #average_rating = serializers.SerializerMethodField()
-    #class Meta:
-    #    model = Movie
-    #    fields = ['movieId', 'title', 'genres', 'year', 'average_rating']
-    #def get_average_rating(self, obj):
-    #    ratings = Rating.objects.filter(movie=obj)
-
-    #    if ratings.exists():
-    #        return round(sum(rating.rating for rating in ratings) / len(ratings),2)
-        
-       
-    #    return None
-    
-    
-
-
-
+from .models import Movie, Rating, Tag, Person, Cast, Genre
 
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
         fields = ['id', 'name']
 
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name']
+
+class PersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = ['id', 'name', 'tmdb_id','imdb_id','profile_url']
+
+class CastSerializer(serializers.ModelSerializer):
+    person = PersonSerializer()
+    class Meta:
+        model = Cast
+        fields = ("person", "character", "role_type", "job", "order")
+
 class MovieSerializer(serializers.ModelSerializer):
     genres = GenreSerializer(many=True, read_only=True)
-    castings = MovieCastSerializer(many=True, read_only=True)
-    class Meta:
-        model = Movie
-        fields = [
-            'movieId', 'title', 'overview', 'poster_url', 
-            'slug', 'rating_count', 'avg_rating', 'year', 'genres', 'castings'
-        ]
-        read_only_fields = ['slug', 'rating_count', 'avg_rating']  # Make these fields read-only
-
-class RatingSerializer(serializers.ModelSerializer):
-    movie = MovieSerializer(read_only=True)
-
-    class Meta:
-        model = Rating
-        fields = ['userId', 'movie', 'rating']
-        read_only_fields = ['movie']  # Make movie read-only to prevent direct assignment
-from rest_framework import serializers
-from .models import Movie
-
-class MovieListSerializer(serializers.ModelSerializer):
-    avg_rating_calc = serializers.FloatField(read_only=True)
-    rating_count_calc = serializers.IntegerField(read_only=True)
-
+    tags = TagSerializer(many=True, read_only=True)
+    cast = CastSerializer(many=True, read_only=True)
     class Meta:
         model = Movie
         fields = (
-            "movieId", "slug", "title", "year", "poster_url", "overview",
-            "average_rating", "rating_count",      # stored fields, still available
-            "avg_rating_calc", "rating_count_calc" # computed fields
+            "id","slug","title","original_title","release_year","overview","poster_url",
+            "runtime","popularity","vote_average","vote_count","avg_rating","rating_count",
+            "tmdb_id","imdb_id","genres","tags","cast"
         )
+
+class RatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Rating
+        fields = ("id","user","movie","rating","created_at","updated_at")
+
+
+
+
+
+
+        
+

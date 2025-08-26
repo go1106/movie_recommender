@@ -1,215 +1,191 @@
-from django.db import models
+# app/models.py
 from django.conf import settings
+from django.db import models
 from django.utils.text import slugify
+from django.db.models.functions import Lower
 
-#----lookups-----
+User = settings.AUTH_USER_MODEL
 
-class Genre(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    tmdb_id = models.IntegerField(unique=True, null=True, blank=True)  # Optional field for TMDb ID
+class TimeStamped(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        abstract = True
+        
 
-    def __str__(self):
-        return self.name
+class Genre(TimeStamped):
+    name = models.CharField(max_length=64, unique=True)
+    tmdb_id = models.IntegerField(null=True, blank=True, unique=True)
+    def __str__(self): return self.name
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="uniq_genre_lower_name_ci_v1"),
+        ]
 
-class Tag(models.Model):
-    name = models.CharField(max_length=50, unique=True)
+class Tag(TimeStamped):
+    name = models.CharField(max_length=64, unique=True)
+    def __str__(self): return self.name
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="uniq_tag_lower_name_ci_v1"),
+        ]
 
-    def __str__(self):
-        return self.name
+class Person(TimeStamped):
+    tmdb_id = models.IntegerField(null=True, blank=True, unique=True)
+    name = models.CharField(max_length=128, db_index=True)
+    imdb_id = models.CharField(max_length=16, null=True, blank=True, unique=True)
+    profile_url = models.URLField(null=True, blank=True)
+    def __str__(self): return self.name
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="uniq_person_lower_name_ci_v1"),
+        ]
 
-#----core models-----
+class Provider(TimeStamped):
+    """Streaming/provider info (optional)"""
+    name = models.CharField(max_length=64, unique=True)
+    def __str__(self): return self.name
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="uniq_provider_lower_name_ci_v1"),
+        ]
 
-class Movie(models.Model):
-    #id = models.AutoField(primary_key=True)  # Auto-incrementing primary key
-    movieId = models.IntegerField(primary_key=True)  # Unique identifier for the movie
-    title = models.CharField(max_length=255, db_index=True)  # Title of the movie
-    #genres_text = models.CharField(max_length=255) # remove later, use Genre model
-    #average_rating = models.FloatField(null=True, blank=True)
+class Movie(TimeStamped):
+    tmdb_id = models.IntegerField(null=True, blank=True, unique=True)
+    imdb_id = models.CharField(max_length=16, null=True, blank=True, unique=True)
+    title = models.CharField(max_length=256, db_index=True)
+    original_title = models.CharField(max_length=256, null=True, blank=True)
+    release_year = models.IntegerField(null=True, blank=True, db_index=True)
+    overview = models.TextField(blank=True, default="")
+    poster_url = models.URLField(null=True, blank=True)
+    runtime = models.IntegerField(null=True, blank=True)  # minutes
+    popularity = models.FloatField(default=0.0)           # TMDB pop or your own
+    vote_average = models.FloatField(default=0.0)         # external avg (tmdb/imdb)
+    vote_count = models.IntegerField(default=0)
 
-    year = models.IntegerField(null=True, blank=True)  # Optional field for year of release 
+    # denormalized for speed (updated by signals or cron)
+    avg_rating = models.FloatField(default=0.0, db_index=True)
+    rating_count = models.IntegerField(default=0)
 
-    overview = models.TextField(blank=True)  # Optional field for movie overview
-    poster_url = models.URLField( null=True, blank=True) 
-    imdb_id = models.CharField(max_length=20, null=True, blank=True)  # Optional field for IMDb ID
-    tmdb_id = models.CharField(max_length=20, null=True, blank=True, db_index=True)  # Optional field for TMDb ID
-    #new denormalized fields
-    slug = models.SlugField(max_length=255, unique=True, blank=True)  # Slug field for URL-friendly names
-    rating_count = models.IntegerField(default=0)  # Count of ratings received
-    average_rating = models.FloatField(default=0.0,db_index=True)  # Average rating of the movie
+    genres = models.ManyToManyField(Genre, related_name="movies", blank=True)
+    tags = models.ManyToManyField(Tag, related_name="movies", blank=True)
+    providers = models.ManyToManyField(Provider, related_name="movies", blank=True)
 
-    # new normalized genres+tags
-    tags = models.ManyToManyField(Tag, through='MovieTag', related_name='movies', blank=True)  # Many-to-many relationship with Tag model
-    genres = models.ManyToManyField(Genre, related_name='movies', blank=True)  # Many-to-many relationship with
+    slug = models.SlugField(max_length=300, unique=True, blank=True)
 
     class Meta:
         indexes = [
-            
-            models.Index(fields=['year']),
-            models.Index(fields=['average_rating','rating_count']),
+            models.Index(fields=["release_year"]),
+            models.Index(fields=["-avg_rating", "-rating_count"]),
+            models.Index(fields=["-popularity"]),
+            models.Index(fields=["title"]),  # for LIKE/startswith queries
         ]
-
-    
-    
+        
+        constraints = [
+            models.UniqueConstraint(fields=["title", "release_year"], name="uniq_title_year", condition=models.Q(tmdb_id__isnull=True)),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            base = slugify(f"{self.title}-{self.year or ''}") or "movie"
-            self.slug = f"{base}-{self.movieId}"
+            base = f"{self.title}-{self.release_year or ''}"
+            slug = slugify(base)[:300]
+            n = 1
+            while Movie.objects.filter(slug=slug).exists():
+                slug = f"{slugify(base)}-{n}"
+                n += 1
+            self.slug = slug
         super().save(*args, **kwargs)
-                
-        
-    def __str__(self):
-        return self.title
 
-class Rating(models.Model):
-    userId = models.IntegerField(db_index=True)  # Assuming userId is an integer, adjust as needed
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='ratings')
-    rating = models.FloatField()
+    def __str__(self): return f"{self.title} ({self.release_year or '—'})"
 
-    #timestamp = models.DateTimeField(auto_now_add=True) 
+class Cast(TimeStamped):
+    """Through table for credits"""
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="cast")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="credits")
+    character = models.CharField(max_length=128, blank=True, default="")
+    order = models.IntegerField(default=999)
+    role_type = models.CharField(max_length=16, choices=[("cast","Cast"),("crew","Crew")], default="cast")
+    job = models.CharField(max_length=64, blank=True, default="")  # e.g., Director
     class Meta:
-        unique_together = ('userId', 'movie')
-        indexes = [
-            models.Index(fields=['movie', 'rating'])
-        ]
+        unique_together = [("movie","person","role_type","job")]
+        ordering = ["order"]
+        constraints = [
+            models.UniqueConstraint(fields=["movie", "person", "role_type", "job", "character"],
+                                    name="uniq_credit_per_character")
+            ]
 
-    def __str__(self):
-        return f'User {self.userId} rated {self.movie.title} with {self.rating}'
+# Engagement & social
+from django.core.validators import MinValueValidator, MaxValueValidator
 
-
-
-class MovieTag(models.Model):
-    id = models.AutoField(primary_key=True)  # Auto-incrementing primary key
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
-    userId = models.IntegerField(null=True, blank=True)  # Assuming you want to track which user added the tag
-
-     # Ensure a user can only tag a movie once with a specific tag
+class Rating(TimeStamped):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="ratings")
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="ratings")
+    rating = models.DecimalField(max_digits=3, decimal_places=1, validators=[MinValueValidator(0.0), MaxValueValidator(5.0)])  # 0.5–5.0
     class Meta:
-        unique_together = (('movie', 'tag', 'userId'),)
+        unique_together = [("user","movie")]
+        indexes = [models.Index(fields=["movie","rating"]), models.Index(fields=["user"])]
+        constraints = [models.CheckConstraint(check=models.Q(rating__gte=0.0) & models.Q(rating__lte=5.0), name="rating_range")]
 
-    def __str__(self):
-        return f'{self.movie.title} - {self.tag.name}'
-
-class Person(models.Model):
-    name = models.CharField(max_length=255,db_index=True)  # Name of the person (actor, director, etc.)
-    tmdb_id = models.CharField(max_length=20, unique=True, null=True,blank=True)  # Unique identifier for TMDb
-    imdb_id = models.CharField(max_length=20, unique=True, null =True,blank=True)  # Unique identifier for IMDb
-    profile_url = models.URLField(null=True, blank=True)  # Optional field for profile URL
-
-    def __str__(self):
-        return self.name
-class MovieCast(models.Model):
-    ROLE_TYPES = (
-        ('cast', 'Cast'),
-        ('crew', 'Crew'),
-        
-        # Add more roles as needed
-    )
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='castings')
-    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name='credits')
-
-    character = models.CharField(max_length=255)  # e.g., 'actor', 'director', etc.
-    order = models.IntegerField(default=999)  # Optional field to specify order of appearance
-
-
-    role_type = models.CharField(max_length=16, choices=ROLE_TYPES, default='cast')  # Type of role (cast, crew, etc.)
-    job = models.CharField(max_length=64, blank=True, default="")  # Optional field for job title (e.g., director, writer)
-    
-    class Meta:
-        unique_together = ('movie', 'person','role_type',"job")  # Ensure a person can only have one role per movie
-        ordering = ['order', 'id']  # Order by appearance and character
-
-    def __str__(self):
-        label = self.character or self.job or 'Unknown Role'
-        return f'{self.person.name} as {label} in {self.movie.title}'
-    
-class Review(models.Model):
-    userId = models.IntegerField(db_index=True)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='reviews')
-    title = models.CharField(max_length=120, blank=True, default='')
+class Review(TimeStamped):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reviews")
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="reviews")
+    title = models.CharField(max_length=120, blank=True, default="")
     body = models.TextField()
     spoiler = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
 
-class List(models.Model):
-    LIST_TYPES = (('watch','Watchlist'), ('seen','Seen'), ('custom','Custom'))
-    userId = models.IntegerField(db_index=True)
+
+class List(TimeStamped):
+    """Watchlist/Seen/Custom lists"""
+    LIST_TYPES = [("watch","Watchlist"), ("seen","Seen"), ("custom","Custom")]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lists")
     name = models.CharField(max_length=64)
-    type = models.CharField(max_length=16, choices=LIST_TYPES, default='custom')
-    created_at = models.DateTimeField(auto_now_add=True)
-
+    type = models.CharField(max_length=16, choices=LIST_TYPES, default="custom")
     class Meta:
-        unique_together = (('userId','name'),)
+        unique_together = [("user","name")]
 
-class ListItem(models.Model):
-    list = models.ForeignKey(List, on_delete=models.CASCADE, related_name='items')
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
+class ListItem(TimeStamped):
+    list = models.ForeignKey(List, on_delete=models.CASCADE, related_name="items")
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="+")
     position = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
     class Meta:
-        unique_together = (('list','movie'),)
-        ordering = ['position','-created_at']
+        unique_together = [("list","movie")]
+        ordering = ["position","-created_at"]
 
+class Follow(TimeStamped):
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name="following")
+    followee = models.ForeignKey(User, on_delete=models.CASCADE, related_name="followers")
+    class Meta:
+        unique_together = [("follower","followee")]
 
+# Telemetry for analytics & online learning
 
-# --- Analytics & Recommender ---
-
-class Event(models.Model):
-    """
-    Lightweight event log for feed/recs UX:
-    - impression: item shown
-    - click: item opened
-    - like/dismiss/rate: feedback actions
-    """
-    ACTIONS = (
-        ('impression','impression'),
-        ('click','click'),
-        ('like','like'),
-        ('dismiss','dismiss'),
-        ('rate','rate'),
-    )
-    userId = models.IntegerField(null=True, blank=True, db_index=True)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, null=True, blank=True, related_name='events')
+class Event(TimeStamped):
+    """Track actions for analytics and CTR (view, click, like, dismiss)"""
+    ACTIONS = [("impression","impression"),("click","click"),("like","like"),("dismiss","dismiss"),("rate","rate")]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="events", null=True, blank=True)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="events", null=True, blank=True)
     action = models.CharField(max_length=12, choices=ACTIONS)
-    context = models.JSONField(default=dict, blank=True)  # e.g. {"algo":"hybrid","slot":3}
-    created_at = models.DateTimeField(auto_now_add=True)
+    context = models.JSONField(default=dict, blank=True)  # e.g., {"slot":3,"algo":"hybrid"}
 
-    class Meta:
-        indexes = [
-            models.Index(fields=['userId','action','created_at']),
-            models.Index(fields=['action','created_at']),
-        ]
+# Recommender artifacts (cache + embeddings)
 
-class RecommendationCache(models.Model):
-    """
-    Snapshot of top-K for a user (store movieId ints).
-    Keep TTL app-side or refresh on demand.
-    """
-    userId = models.IntegerField(unique=True, db_index=True)
-    items = models.JSONField(default=list, blank=True)   # e.g., [123, 456, 789]
-    model_version = models.CharField(max_length=32, default='v1')
-    updated_at = models.DateTimeField(auto_now=True)
+class RecommendationCache(TimeStamped):
+    """Snapshot of top-K recommended IDs for a user (TTL enforced app-side/Redis preferred)"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="rec_cache")
+    items = models.JSONField(default=list, blank=True)  # [movie_id,...]
+    model_version = models.CharField(max_length=32, default="v1")
 
-class Embedding(models.Model):
-    """
-    Generic vector store. Start with BinaryField (packed float32).
-    Later you can migrate to pgvector.
-    """
-    OBJECT_TYPES = (('movie','movie'), ('user','user'), ('tag','tag'))
+class Embedding(TimeStamped):
+    """Optional: store dense vectors for ANN search / hybrid scoring"""
+    OBJECT_TYPES = [("movie","movie"), ("user","user"), ("tag","tag")]
     object_type = models.CharField(max_length=8, choices=OBJECT_TYPES)
-    object_id = models.IntegerField(db_index=True)  # movieId, userId, or Tag.pk
+    object_id = models.IntegerField(db_index=True)
     dim = models.IntegerField()
-    vector = models.BinaryField()                   # pack with numpy.tobytes()
-    model_version = models.CharField(max_length=32, default='v1')
-    created_at = models.DateTimeField(auto_now_add=True)
-
+    vector = models.BinaryField()  # packed float32 (or use pgvector extension)
+    model_version = models.CharField(max_length=32, default="v1")
     class Meta:
-        unique_together = (('object_type','object_id','model_version'),)
-        indexes = [
-            models.Index(fields=['object_type','model_version']),
-            models.Index(fields=['object_id']),
-        ]
+        unique_together = [("object_type","object_id","model_version")]
+        indexes = [models.Index(fields=["object_type", "object_id", "model_version"])]
+
 
 
