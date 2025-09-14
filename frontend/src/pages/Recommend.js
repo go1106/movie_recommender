@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useApiBase, apiUrl,fetchJson } from "../lib/api";
 
 /**
  * HomePage.jsx
@@ -16,67 +15,48 @@ import { useApiBase, apiUrl,fetchJson } from "../lib/api";
  *     -> { results: [{ id, title, poster_url, year, average_rating, ... }], ... }
  */
 
-
-export default function HomePage() {
-
-    const navigate = useNavigate();
-    const { apiBase } = useApiBase();        // 👈 get base (persisted)
-    const [top, setTop] = useState([]);
-    const [loadingTop, setLoadingTop] = useState(false);
-    const [errorTop, setErrorTop] = useState("");
+// ---------- API client ----------
 
 
-    
-      // Background slideshow index
-    const [slide, setSlide] = useState(0);
-    const timerRef = useRef(null);
-    
-      // Search state
-    const [query, setQuery] = useState("");
-    useEffect(() => {
-        let ignore = false;
+const TOP10_ENDPOINT = "/api/movies/";
 
-        (async () => {
-            setLoadingTop(true);
-            setErrorTop("");
-            try {
-            const url = apiUrl(apiBase, "/movies/", {
-                // use whatever your backend supports; if 'sort' not supported, try ordering=-average_rating
-                sort: "rating_desc",
-                page: "1",
-                page_size: "10",
-                format: "json",
-            });
-            console.log("[Top10] GET", url);
-            const data = await fetchJson(url, { headers: { Accept: "application/json" } });
+export default function Recommend() {
+  const navigate = useNavigate();
 
-            // Accept common shapes: array, {results:[]}, {data:[]}, {items:[]}
-            const results =
-                Array.isArray(data) ? data :
-                Array.isArray(data.results) ? data.results :
-                Array.isArray(data.data) ? data.data :
-                Array.isArray(data.items) ? data.items : [];
+  // Top 10 state
+  const [top, setTop] = useState([]);
+  const [loadingTop, setLoadingTop] = useState(false);
+  const [errorTop, setErrorTop] = useState("");
 
-            if (!ignore) setTop(results.slice(0, 10));
-            if (!ignore && results.length === 0) {
-                // don't throw; just show a gentle hint in console
-                console.warn("[Top10] JSON parsed but no results[]/data[]/items[] found. Keys:", Object.keys(data || {}));
-            }
-            } catch (e) {
-            console.error("[Top10] failed:", e);
-            if (!ignore) setErrorTop("Failed to load Top 10.");
-            } finally {
-            if (!ignore) setLoadingTop(false);
-            }
-        })();
+  // Background slideshow index
+  const [slide, setSlide] = useState(0);
+  const timerRef = useRef(null);
 
-        return () => { ignore = true; };
-        }, [apiBase]);
+  // Search state
+  const [query, setQuery] = useState("");
 
-    
-
-
-   
+  // Fetch Top 10 rated movies
+  useEffect(() => {
+    let ignore = false;
+    async function fetchTop() {
+      setLoadingTop(true);
+      setErrorTop("");
+      try {
+        const qs = new URLSearchParams({ sort: "rating_desc", page: "1", page_size: "10" });
+        const res = await fetch(`${TOP10_ENDPOINT}?${qs.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!ignore) setTop(data.results ?? []);
+      } catch (e) {
+        console.error(e);
+        if (!ignore) setErrorTop("Failed to load Top 10.");
+      } finally {
+        if (!ignore) setLoadingTop(false);
+      }
+    }
+    fetchTop();
+    return () => { ignore = true; };
+  }, []);
 
   // Auto-advance slideshow
   useEffect(() => {
@@ -212,64 +192,9 @@ export default function HomePage() {
 
       {/* Footer spacing so bottom bar doesn't overlap content on very small screens */}
       <div className="h-20" />
-
-      {/* Hero */}
-        <section className="mx-auto max-w-6xl px-4 py-16">
-        <div className="grid gap-8 md:grid-cols-2 md:items-center">
-        <div>
-        <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
-        Discover, rate, and curate your favorite films
+      <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
+              Discover, rate, and curate your favorite films
         </h1>
-        <p className="mt-3 text-base text-gray-600">
-        Search a growing catalog, filter by genre and rating, and save the gems. Add new titles to keep the library fresh.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-        <Link
-        to="/search"
-        className="rounded-xl bg-black px-4 py-2 text-white hover:opacity-90"
-        >
-        Start Searching
-        </Link>
-        <Link
-        to="/movies/create"
-        className="rounded-xl border px-4 py-2 hover:bg-gray-50"
-        >
-        Add a Movie
-        </Link>
-        </div>
-        </div>
-
-        {/* Side image / illustration placeholder */}
-        <div className="relative order-first h-48 overflow-hidden rounded-2xl bg-gray-100 md:order-last md:h-72">
-        <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-        Poster collage
-        </div>
-        </div>
-        </div>
-        </section>
-
-        {/* Highlights */}
-        <section className="border-t bg-gray-50">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-12 sm:grid-cols-3">
-        <Feature title="Powerful Search" desc="Filter by genre, year, and rating to find exactly what you want." />
-        <Feature title="Smart Ratings" desc="See average scores and trend sorts at a glance." />
-        <Feature title="Creator Tools" desc="Submit new titles and enrich the catalog with clean forms." />
-        </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="mx-auto max-w-6xl px-4 py-6 text-xs text-gray-500">
-        © {new Date().getFullYear()} Movie App
-        </footer>
     </main>
   );
-}
-
-function Feature({ title, desc }) {
-    return (
-        <div className="rounded-2xl border bg-white p-4">
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-1 text-sm text-gray-600">{desc}</p>
-        </div>
-    );
 }
