@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import './App.css';
 
 /**
  * Single‑file React app for your Django Movie API
@@ -87,7 +88,7 @@ function Input({ className = "", ...props }) {
   return <input className={`w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 ${className}`} {...props} />
 }
 function Button({ className = "", variant = "primary", ...props }) {
-  const base = "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition";
+  const base = "inline-flex items-center gap-6 rounded-xl px-3 py-2 text-sm font-medium transition";
   const styles = variant === "ghost" ? "bg-transparent hover:bg-zinc-800 text-zinc-200" :
                  variant === "secondary" ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-100" :
                  "bg-indigo-600 hover:bg-indigo-500 text-white";
@@ -104,18 +105,20 @@ function Card({ children, className = "" }) {
 function Shell({ children, apiBase, setApiBase }) {
   const [showCfg, setShowCfg] = useState(false);
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-950 to-zinc-900 text-zinc-100">
-      <header className="sticky top-0 z-20 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <nav className="flex items-center gap-3 text-sm">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-950 to-zinc-900 text-zinc-100 justify-around flex flex-col">
+      <header className="sticky top-10 z-20 border-b border-zinc-800/70 bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-around px-4 py-3">
+          <nav className="flex items-center gap-6 text-sm">
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800" to="/">Home</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800" to="/browse">Browse</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800" to="/trending">Trending</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800" to="/top-rated">Top Rated</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800" to="/recs">Recs</Link>
           </nav>
+          
+
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => setShowCfg(v => !v)}>API</Button>
+           
           </div>
         </div>
         {showCfg && (
@@ -129,7 +132,7 @@ function Shell({ children, apiBase, setApiBase }) {
           </div>
         )}
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6 justify-around flex flex-col">
         {children}
       </main>
       <footer className="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-zinc-500">Movie Recommender • React + Django</footer>
@@ -237,7 +240,8 @@ function Browse({ apiBase }) {
             {results.map((m) => (
               <Link key={m.id} to={`/movie/${m.slug}`} className="group">
                 <Card className="overflow-hidden">
-                  <Poster src={m.poster_url} alt={m.title} className="h-64 w-full object-cover" />
+                   
+                   <Poster src={m.poster_url} alt={m.title} className="h-64 w-full object-cover" />
                   <div className="p-3">
                     <div className="line-clamp-1 font-medium group-hover:text-indigo-400">{m.title}</div>
                     <div className="mt-0.5 text-xs text-zinc-400">{m.release_year ?? "—"}</div>

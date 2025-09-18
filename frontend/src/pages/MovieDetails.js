@@ -1,84 +1,103 @@
-// src/pages/MovieDetail.jsx
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { apiGet } from "../api";
-import MovieCard from "../components/MovieCard";
-import ProvidersBar from "../components/ProvidersBar";
+import { useParams, Link } from "react-router-dom";
+import { fetchJson } from "../lib/api";
+import Card from "../components/Card";
+import Poster from "../components/Poster";
+import StarBar from "../components/StarBar";
+import Chip from "../components/Chip";
 
-export default function MovieDetail({ userId }) {
+export default function MovieDetail({ apiBase }) {
   const { slug } = useParams();
-  const [movie, setMovie] = useState(null);
-  const [more, setMore] = useState([]);
-  const [err, setErr] = useState(null);
+  const [state, setState] = useState({ loading: true, error: null, movie: null });
+  const [mlt, setMlt] = useState({ loading: true, error: null, items: [] });
 
   useEffect(() => {
-    let current = true;
+    let alive = true;
     (async () => {
       try {
-        const m = await apiGet(`/api/movies/${slug}/`);
-        if (!current) return;
-        setMovie(m);
-        const ml = await apiGet(`/api/movies/${m.movieId}/more-like-this/`, { k: 12 });
-        if (!current) return;
-        setMore(ml);
+        setState(s => ({ ...s, loading: true, error: null }));
+        const movie = await fetchJson(`${apiBase}/movies/${slug}/`);
+        if (!alive) return;
+        setState({ loading: false, error: null, movie });
       } catch (e) {
-        if (current) setErr(e);
+        if (!alive) return; setState({ loading: false, error: e.message, movie: null });
       }
     })();
-    return () => { current = false; };
-  }, [slug]);
+    return () => { alive = false; };
+  }, [apiBase, slug]);
 
-  if (err) return <div className="text-red-600">Failed to load movie</div>;
-  if (!movie) return <div className="h-96 animate-pulse bg-neutral-100 rounded-2xl" />;
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setMlt({ loading: true, error: null, items: [] });
+        const items = await fetchJson(`${apiBase}/movies/${slug}/more_like_this/`);
+        if (!alive) return;
+        setMlt({ loading: false, error: null, items });
+      } catch (e) {
+        if (!alive) return; setMlt({ loading: false, error: e.message, items: [] });
+      }
+    })();
+    return () => { alive = false; };
+  }, [apiBase, slug]);
+
+  if (state.loading) return <Card className="p-6 text-sm text-zinc-400">Loading…</Card>;
+  if (state.error) return <Card className="p-6 text-sm text-red-400">Error: {state.error}</Card>;
+  const m = state.movie;
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col md:flex-row gap-6">
-        <img src={movie.poster_url || "/placeholder-poster.jpg"} alt={`${movie.title} poster`} className="w-48 rounded-xl" />
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">
-            {movie.title} <span className="text-neutral-500">({movie.year || "—"})</span>
-          </h1>
-          <div className="mt-2 text-sm text-neutral-700">
-            ⭐ {movie.average_rating?.toFixed?.(1) ?? "—"} • {movie.rating_count ?? 0} ratings
+    <div className="grid gap-6 md:grid-cols-[280px_1fr]">
+      <Card className="overflow-hidden">
+        <Poster src={m.poster_url} alt={m.title} className="h-full w-full object-cover" />
+      </Card>
+      <div className="grid gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{m.title} <span className="text-zinc-400">({m.release_year ?? "—"})</span></h1>
+          <div className="mt-2 flex items-center gap-3 text-sm">
+            <StarBar value={Number(m.avg_rating || 0)} />
+            <span className="text-zinc-400">{m.rating_count ?? 0} ratings</span>
+            {m.runtime ? <span className="text-zinc-500">• {m.runtime} min</span> : null}
           </div>
-          <div className="mt-4 leading-7">{movie.overview}</div>
-          {!!movie.genres?.length && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {movie.genres.map(g => (
-                <span key={g.id} className="text-xs px-2 py-0.5 bg-neutral-100 rounded-full">{g.name}</span>
+        </div>
+        <div className="text-sm text-zinc-300">
+          <p className="whitespace-pre-line">{m.overview || "No overview."}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(m.genres || []).map(g => <Chip key={g.id}>{g.name}</Chip>)}
+            {(m.tags || []).slice(0, 6).map(t => <Chip key={t.id}>{t.name}</Chip>)}
+          </div>
+        </div>
+        <div>
+          <h3 className="mb-2 font-semibold">Cast</h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {(m.cast || []).map((c, i) => (
+              <Card key={`${c.name}-${i}`} className="p-3">
+                <div className="line-clamp-1 font-medium">{c.name || "Unknown"}</div>
+                <div className="line-clamp-1 text-xs text-zinc-400">{c.character || c.job || ""}</div>
+              </Card>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h3 className="mb-2 font-semibold">More like this</h3>
+          {mlt.loading && <Card className="p-4 text-sm text-zinc-400">Loading…</Card>}
+          {mlt.error && <Card className="p-4 text-sm text-red-400">Error: {mlt.error}</Card>}
+          {!mlt.loading && !mlt.error && (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {mlt.items.map(item => (
+                <Link key={item.id} to={`/movie/${item.slug}`} className="group">
+                  <Card className="overflow-hidden">
+                    <Poster src={item.poster_url} alt={item.title} className="h-48 w-full object-cover" />
+                    <div className="p-3">
+                      <div className="line-clamp-1 font-medium group-hover:text-indigo-400">{item.title}</div>
+                      <div className="mt-0.5 text-xs text-zinc-400">{item.release_year ?? "—"}</div>
+                    </div>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
-
-          {/* Where to watch */}
-          <ProvidersBar providers={movie.providers} region="US" />
-
-          {/* Top billed cast */}
-          {!!movie.cast?.length && (
-            <div className="mt-5">
-              <h3 className="font-semibold mb-2">Top billed cast</h3>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {movie.cast.slice(0, 10).map(p => (
-                  <div key={p.id} className="min-w-[96px] text-center">
-                    <img src={p.profile_url || "/avatar.png"} alt={p.name} className="w-24 h-24 object-cover rounded-full mb-1" loading="lazy" />
-                    <div className="text-xs">{p.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      </header>
-
-      <section>
-        <h2 className="text-xl font-bold mb-3">More like this</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3">
-          {more.map((m, i) => (
-            <MovieCard key={m.movieId} movie={m} lane="mlt" slot={i} userId={userId} />
-          ))}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

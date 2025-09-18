@@ -126,6 +126,15 @@ class Rating(TimeStamped):
         indexes = [models.Index(fields=["movie","rating"]), models.Index(fields=["user"])]
         constraints = [models.CheckConstraint(check=models.Q(rating__gte=0.0) & models.Q(rating__lte=5.0), name="rating_range")]
 
+class Tagging(models.Model):
+    """A user applied a tag to a movie at a time."""
+    movie = models.ForeignKey(Movie, related_name="taggings", on_delete=models.CASCADE)
+    user  = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="taggings", on_delete=models.CASCADE)
+    tag   = models.ForeignKey(Tag, related_name="taggings", on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = (("movie", "user", "tag"),)
+
 class Review(TimeStamped):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reviews")
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="reviews")
