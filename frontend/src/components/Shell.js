@@ -56,6 +56,8 @@ export default function Shell({
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800/60" to="/trending">Trending</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800/60" to="/top-rated">Top Rated</Link>
             <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800/60" to="/recs">Recs</Link>
+            <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800/60" to="/sign-in">Sign In</Link>
+            <Link className="rounded-xl px-2 py-1 hover:bg-zinc-800/60" to="/sign-up">New Customer</Link>
           </nav>
           <div className="flex items-center gap-2">
           

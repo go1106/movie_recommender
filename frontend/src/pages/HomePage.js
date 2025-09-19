@@ -14,10 +14,12 @@ export default function HomePage() {
       <Card className="p-6">
         <h3 className="mb-2 text-lg font-semibold">Quick Links</h3>
         <div className="flex flex-wrap gap-2">
-          <Link to="/browse"><Button>Browse</Button></Link>
+          <Link to="/browse"><Button variant="secondary">Browse</Button></Link>
           <Link to="/trending"><Button variant="secondary">Trending</Button></Link>
           <Link to="/top-rated"><Button variant="secondary">Top Rated</Button></Link>
-          <Link to="/recs"><Button variant="ghost">Recommendations</Button></Link>
+          <Link to="/recs"><Button variant="secondary">Recommendations</Button></Link>
+          <Link to="/sign-in"><Button variant="secondary">Sign In</Button></Link>
+          <Link to="/sign-up"><Button variant="secondary">Sign Up</Button></Link>
         </div>
       </Card>
     </div>

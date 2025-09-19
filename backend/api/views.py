@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.db.models import Avg, Value, F, Q
 from django.db.models import Prefetch
 
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions, generics
 from .models import Movie, Rating, Cast, Person, Genre
 from .serializers import MovieSerializer, RatingSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -27,15 +27,36 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import Movie, Genre, Tag, Cast, Person, Rating
-from .serializers import MovieSerializer, RatingSerializer
 
 from django.contrib.auth import get_user_model
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import RecommendationCache, Movie
-from .serializers import MovieSerializer
+from .models import RecommendationCache, Movie, Rating,Tagging,Review
+from .serializers import MovieSerializer, RatingSerializer,TaggingSerializer,CommentSerializer,RegisterSerializer
 
 User = get_user_model()
+class RegisterView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]  # anyone can register
+
+class RatingViewSet(viewsets.ModelViewSet):
+    serializer_class = RatingSerializer
+    permission_classes = [permissions.IsAuthenticated]  # ✅ users only
+    def get_queryset(self):
+        # restrict list to the current user's ratings (or remove filter if you want all)
+        return Rating.objects.filter(user=self.request.user)
+
+class TaggingViewSet(viewsets.ModelViewSet):
+    serializer_class = TaggingSerializer
+    permission_classes = [permissions.IsAuthenticated]  # ✅ users only
+    def get_queryset(self):
+        return Tagging.objects.filter(user=self.request.user)
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]  # ✅ users only
+    def get_queryset(self):
+        return Review.objects.filter(user=self.request.user)
 
 class RecCacheView(APIView):
     def get(self, request, username):
@@ -209,6 +230,8 @@ class RecommendView(APIView):
         )
 
         return Response(MovieSerializer(qs[:40], many=True).data)
+    
+
 
 
 

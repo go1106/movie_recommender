@@ -50,8 +50,8 @@ export default function Browse({ apiBase }) {
   const count = state.data?.count ?? results.length;
 
   return (
-    <div>
-      <card >
+    <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
+      <Card >
         <div>
           <div className="col-span-2 md:col-span-2">
             <label className="mb-1 text-white bg-black">Title</label>
@@ -78,7 +78,7 @@ export default function Browse({ apiBase }) {
             <Input value={minRating} onChange={e => { setMinRating(e.target.value); setPage(1); }} placeholder="3.5" />
           </div>
         </div>
-      </card>
+      </Card>
 
       {state.loading && <Card className="p-6 text-sm text-zinc-400">Loading…</Card>}
       {state.error && <Card className="p-6 text-sm text-red-400">Error: {state.error}</Card>}

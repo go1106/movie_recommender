@@ -8,6 +8,8 @@ import MoviesBasic from "./pages/MovieBasic";
 //import Recommend from "./pages/Recommend";
 import { useApiBase } from "./lib/api";
 import Shell from "./components/Shell";
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 
 
 
@@ -28,6 +30,10 @@ export default function App() {
             <Route path="/recs" element={<Recs apiBase={apiBase} />} />
             <Route path="/movie/:slug" element={<MovieDetail apiBase={apiBase} />} />
             <Route path="*" element={<div>404 Not Found</div>} />
+            <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/sign-up" element={<SignUp />} />
+                  
+            
         </Routes>
       </Shell>
       <footer className="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-zinc-500">Movie Recommender • React + Django</footer>

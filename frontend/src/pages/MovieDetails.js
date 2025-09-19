@@ -1,15 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchJson } from "../lib/api";
 import Card from "../components/Card";
 import Poster from "../components/Poster";
 import StarBar from "../components/StarBar";
 import Chip from "../components/Chip";
+import MovieActions from "../components/MovieActions";
+
+
+
+
+
 
 export default function MovieDetail({ apiBase }) {
   const { slug } = useParams();
   const [state, setState] = useState({ loading: true, error: null, movie: null });
   const [mlt, setMlt] = useState({ loading: true, error: null, items: [] });
+
+
+
+  const fetchMovie = useCallback(async () => {
+    setState(s => ({ ...s, loading: true, error: null }));
+    try {
+      const movie = await fetchJson(`${apiBase}/movies/${slug}/`);
+      setState({ loading: false, error: null, movie });
+    } catch (e) {
+      setState({ loading: false, error: String(e), movie: null });
+    }
+  }, [apiBase, slug]);
+
+  useEffect(() => { fetchMovie(); }, [fetchMovie]);
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +87,24 @@ export default function MovieDetail({ apiBase }) {
           </div>
         </div>
         <div>
+                  {/* NEW: Actions */}
+          
+          <MovieActions apiBase={apiBase} movieId={m.id} onChanged={fetchMovie} />
+
+                  {/* Overview / tags */}
+          <div className="text-sm text-zinc-300">
+              <p className="whitespace-pre-line">{m.overview || "No overview."}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(m.genres || []).map(g => <Chip key={g.id}>{g.name}</Chip>)}
+                {(m.tags || []).slice(0, 10).map(t => <Chip key={t.id || t}>{t.name || t}</Chip>)}
+              </div>
+          </div>
+
+
+
+
+        </div>
+        <div>
           <h3 className="mb-2 font-semibold">Cast</h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {(m.cast || []).map((c, i) => (
@@ -101,3 +139,6 @@ export default function MovieDetail({ apiBase }) {
     </div>
   );
 }
+
+
+
